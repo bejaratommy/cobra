@@ -850,6 +850,55 @@ func TestPersistentFlagsOnChild(t *testing.T) {
 	}
 }
 
+// TestChildFlagBeforeSubcommand verifies that a flag defined on a sub-command
+// can be placed before the sub-command name on the command line without being
+// misinterpreted as an unknown flag that consumes the sub-command name as its
+// value (regression test for https://github.com/spf13/cobra/issues/2251).
+func TestChildFlagBeforeSubcommand(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantVal bool
+	}{
+		{
+			name:    "root flag before subcommand",
+			args:    []string{"--rootflag", "sub"},
+			wantVal: true,
+		},
+		{
+			name:    "child flag before subcommand (bool, no =)",
+			args:    []string{"--cmdflag", "sub"},
+			wantVal: true,
+		},
+		{
+			name:    "child flag before subcommand (bool, with =true)",
+			args:    []string{"--cmdflag=true", "sub"},
+			wantVal: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var flagValue bool
+			rootCmd := &Command{Use: "root", SilenceUsage: true, Args: NoArgs, Run: emptyRun}
+			rootCmd.PersistentFlags().BoolVar(&flagValue, "rootflag", false, "root boolean flag")
+
+			subCmd := &Command{Use: "sub", SilenceUsage: true, Args: NoArgs, Run: emptyRun}
+			subCmd.PersistentFlags().BoolVar(&flagValue, "cmdflag", false, "sub boolean flag")
+			rootCmd.AddCommand(subCmd)
+
+			flagValue = false
+			_, err := executeCommand(rootCmd, tt.args...)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !flagValue {
+				t.Errorf("expected flag to be true, got false")
+			}
+		})
+	}
+}
+
 func TestRequiredFlags(t *testing.T) {
 	c := &Command{Use: "c", Run: emptyRun}
 	c.Flags().String("foo1", "", "")

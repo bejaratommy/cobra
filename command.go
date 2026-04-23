@@ -671,6 +671,32 @@ func shortHasNoOptDefVal(name string, fs *flag.FlagSet) bool {
 	return flag.NoOptDefVal != ""
 }
 
+// flagTakesValue reports whether the named flag is known to fs and requires a
+// separate value argument (i.e. it is not a boolean/no-opt-default flag).
+// Unknown flags are treated as not requiring a value so that flags belonging
+// to sub-commands do not inadvertently consume the sub-command name when
+// stripping flags during command traversal.
+func flagTakesValue(name string, fs *flag.FlagSet) bool {
+	f := fs.Lookup(name)
+	if f == nil {
+		// Unknown to this command – could belong to a sub-command.
+		return false
+	}
+	return f.NoOptDefVal == ""
+}
+
+// shortFlagTakesValue is the short-flag equivalent of flagTakesValue.
+func shortFlagTakesValue(name string, fs *flag.FlagSet) bool {
+	if len(name) == 0 {
+		return false
+	}
+	f := fs.ShorthandLookup(name[:1])
+	if f == nil {
+		return false
+	}
+	return f.NoOptDefVal == ""
+}
+
 func stripFlags(args []string, c *Command) []string {
 	if len(args) == 0 {
 		return args
@@ -688,11 +714,10 @@ Loop:
 		case s == "--":
 			// "--" terminates the flags
 			break Loop
-		case strings.HasPrefix(s, "--") && !strings.Contains(s, "=") && !hasNoOptDefVal(s[2:], flags):
-			// If '--flag arg' then
-			// delete arg from args.
+		case strings.HasPrefix(s, "--") && !strings.Contains(s, "=") && flagTakesValue(s[2:], flags):
+			// If '--flag arg' then delete arg from args.
 			fallthrough // (do the same as below)
-		case strings.HasPrefix(s, "-") && !strings.Contains(s, "=") && len(s) == 2 && !shortHasNoOptDefVal(s[1:], flags):
+		case strings.HasPrefix(s, "-") && !strings.Contains(s, "=") && len(s) == 2 && shortFlagTakesValue(s[1:], flags):
 			// If '-f arg' then
 			// delete 'arg' from args or break the loop if len(args) <= 1.
 			if len(args) <= 1 {
@@ -726,10 +751,10 @@ Loop:
 		case s == "--":
 			// -- means we have reached the end of the parseable args. Break out of the loop now.
 			break Loop
-		case strings.HasPrefix(s, "--") && !strings.Contains(s, "=") && !hasNoOptDefVal(s[2:], flags):
+		case strings.HasPrefix(s, "--") && !strings.Contains(s, "=") && flagTakesValue(s[2:], flags):
 			fallthrough
-		case strings.HasPrefix(s, "-") && !strings.Contains(s, "=") && len(s) == 2 && !shortHasNoOptDefVal(s[1:], flags):
-			// This is a flag without a default value, and an equal sign is not used. Increment pos in order to skip
+		case strings.HasPrefix(s, "-") && !strings.Contains(s, "=") && len(s) == 2 && shortFlagTakesValue(s[1:], flags):
+			// This flag requires a separate value argument and an equal sign is not used. Increment pos in order to skip
 			// over the next arg, because that is the value of this flag.
 			pos++
 			continue
