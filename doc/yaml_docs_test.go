@@ -83,6 +83,28 @@ func TestGenYamlDocRunnable(t *testing.T) {
 	checkStringContains(t, output, "usage: "+rootCmd.Use)
 }
 
+func TestGenYamlDocOmitHiddenFlags(t *testing.T) {
+	c := &cobra.Command{
+		Use:   "mycmd",
+		Short: "test command",
+		Run:   emptyRun,
+	}
+	c.Flags().String("visibleflag", "", "a flag shown in docs")
+	c.Flags().String("hiddenflag", "", "a flag hidden from docs")
+	if err := c.Flags().MarkHidden("hiddenflag"); err != nil {
+		t.Fatal(err)
+	}
+
+	buf := new(bytes.Buffer)
+	if err := GenYaml(c, buf); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	checkStringContains(t, output, "visibleflag")
+	checkStringOmits(t, output, "hiddenflag")
+}
+
 func BenchmarkGenYamlToFile(b *testing.B) {
 	file, err := os.CreateTemp("", "")
 	if err != nil {
