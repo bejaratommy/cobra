@@ -737,6 +737,48 @@ func TestDisableFlagParsing(t *testing.T) {
 	}
 }
 
+func TestMergedFlagsBeforeExecution(t *testing.T) {
+	root := &Command{Use: "root"}
+	parent := &Command{Use: "parent"}
+	child := &Command{Use: "child"}
+	root.PersistentFlags().Bool("verbose", false, "")
+	root.PersistentFlags().String("shadowed", "root", "")
+	root.Flags().Bool("root-local", false, "")
+	parent.PersistentFlags().String("config", "", "")
+	child.PersistentFlags().Bool("persistent", false, "")
+	child.Flags().Bool("local", false, "")
+	child.Flags().String("shadowed", "child", "")
+	localShadow := child.Flags().Lookup("shadowed")
+	root.AddCommand(parent)
+	parent.AddCommand(child)
+
+	if child.Flags().Lookup("verbose") != nil {
+		t.Fatal("Flags unexpectedly includes inherited flags before merging")
+	}
+	merged := child.MergedFlags()
+	for _, name := range []string{"verbose", "config", "persistent", "local", "shadowed"} {
+		if merged.Lookup(name) == nil {
+			t.Errorf("MergedFlags is missing %q", name)
+		}
+	}
+	if merged.Lookup("root-local") != nil {
+		t.Error("MergedFlags includes a parent's local flag")
+	}
+	if merged.Lookup("shadowed") != localShadow {
+		t.Error("MergedFlags did not preserve the local flag")
+	}
+	if merged != child.Flags() || child.MergedFlags() != merged {
+		t.Error("MergedFlags should return the command's parsing flag set")
+	}
+	root.PersistentFlags().Bool("later", false, "")
+	if child.MergedFlags().Lookup("later") == nil {
+		t.Error("MergedFlags is missing a persistent flag added after the first call")
+	}
+	if root.MergedFlags().Lookup("verbose") == nil {
+		t.Error("MergedFlags is missing the root's own persistent flag")
+	}
+}
+
 func TestPersistentFlagsOnSameCommand(t *testing.T) {
 	var rootCmdArgs []string
 	rootCmd := &Command{

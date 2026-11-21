@@ -281,6 +281,19 @@ A flag can also be assigned locally, which will only apply to that specific comm
 localCmd.Flags().StringVarP(&Source, "source", "s", "", "Source directory to read from")
 ```
 
+### Inspecting Flags Before Execution
+
+`cmd.Flags()` returns the flag set used for parsing. Persistent flags are merged
+into it during command execution, so it may not include them during setup.
+Use `cmd.MergedFlags()` to access all applicable flags before execution, including
+persistent flags declared on the command and its parents:
+
+```go
+verboseFlag := localCmd.MergedFlags().Lookup("verbose")
+```
+
+Local flags take precedence over inherited persistent flags with the same name.
+
 ### Local Flag on Parent Commands
 
 By default, Cobra only parses local flags on the target command, and any local flags on

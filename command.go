@@ -1683,8 +1683,9 @@ func (c *Command) GlobalNormalizationFunc() func(f *flag.FlagSet, name string) f
 	return c.globNormFunc
 }
 
-// Flags returns the complete FlagSet that applies
-// to this command (local and persistent declared here and by all parents).
+// Flags returns the FlagSet used to parse this command's flags.
+// Persistent flags are merged into this set during command execution.
+// Use MergedFlags to include persistent flags before execution.
 func (c *Command) Flags() *flag.FlagSet {
 	if c.flags == nil {
 		c.flags = flag.NewFlagSet(c.DisplayName(), flag.ContinueOnError)
@@ -1695,6 +1696,14 @@ func (c *Command) Flags() *flag.FlagSet {
 	}
 
 	return c.flags
+}
+
+// MergedFlags returns all flags that apply to this command, including persistent
+// flags declared here and by all parents. It merges them into Flags even before
+// the command is executed. Local flags take precedence over inherited flags.
+func (c *Command) MergedFlags() *flag.FlagSet {
+	c.mergePersistentFlags()
+	return c.Flags()
 }
 
 // LocalNonPersistentFlags are flags specific to this command which will NOT persist to subcommands.
